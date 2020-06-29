@@ -1,0 +1,14 @@
+{
+  "name": "wasm-nodejs",
+  "version": "0.0.1",
+  "description": "Sample nodejs app that uses the WASM backend",
+  "private": true,
+  "dependencies": {
+    "@tensorflow/tfjs-backend-wasm": "2.0.1",
+    "@tensorflow/tfjs-core": "2.0.1"
+  },
+  "scripts": {
+    "inference": "node src/index.js"
+  },
+  "keywords": []
+}
