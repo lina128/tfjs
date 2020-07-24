@@ -15,13 +15,9 @@
  * =============================================================================
  */
 
-import {Cast, CastAttrs, CastInputs, KernelConfig, TypedArray} from '@tensorflow/tfjs-core';
-
-import {MathBackendCPU} from '../backend_cpu';
-import {assertNotComplex} from '../cpu_util';
+import {Cast, CastAttrs, CastInputs, KernelConfig} from '@tensorflow/tfjs-core';
 
 import {identityConfig} from './Identity';
-import {transposeImpl} from './Transpose_impl';
 
 export const castConfig: KernelConfig = {
   kernelName: Cast,
