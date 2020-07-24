@@ -16,7 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs-core';
-import {engine, env} from '@tensorflow/tfjs-core';
+import {engine, env, TensorInfo} from '@tensorflow/tfjs-core';
 import {backend_util, buffer, slice_util, util} from '@tensorflow/tfjs-core';
 import {BackendTimingInfo, DataStorage, DataType, DataValues, KernelBackend, max, NumericDataType, Rank, reshape, Scalar, ShapeMap, Tensor, Tensor1D, Tensor2D, Tensor3D, Tensor4D, Tensor5D, TensorBuffer, TypedArray, upcastType} from '@tensorflow/tfjs-core';
 import {kernel_impls} from '@tensorflow/tfjs-core';
@@ -56,9 +56,7 @@ export interface TensorData<D extends DataType> {
   // For complex numbers, the real and imaginary parts are stored as their own
   // individual tensors, with a parent joining the two with the
   // complexTensors field.
-  // TODO(smilkov): Replace Tensor with TensorInfo when you modularize ops
-  // that work with complex tensors.
-  complexTensors?: {real: Tensor, imag: Tensor};
+  complexTensors?: {real: TensorInfo, imag: TensorInfo};
 }
 
 export class MathBackendCPU extends KernelBackend {
@@ -166,29 +164,6 @@ export class MathBackendCPU extends KernelBackend {
           ['The reported memory is an upper bound. Due to automatic garbage ' +
            'collection, the true allocated memory may be less.']
     };
-  }
-
-  complex<T extends Tensor>(real: T, imag: T): T {
-    const result = this.makeOutput(null, real.shape, 'complex64');
-
-    const resultData = this.data.get(result.dataId);
-    // The backend owns the reference to the underlying real and imaginary
-    // clones. These will explicitly get disposed when the complex tensor is
-    // disposed.
-    resultData.complexTensors = {
-      real: engine().keep(real.clone()),
-      imag: engine().keep(imag.clone())
-    };
-
-    return result as T;
-  }
-  real<T extends Tensor>(input: T): T {
-    const resultData = this.data.get(input.dataId);
-    return resultData.complexTensors.real.clone() as T;
-  }
-  imag<T extends Tensor>(input: T): T {
-    const resultData = this.data.get(input.dataId);
-    return resultData.complexTensors.imag.clone() as T;
   }
 
   slice<T extends Tensor>(x: T, begin: number[], size: number[]): T {

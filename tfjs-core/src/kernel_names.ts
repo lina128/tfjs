@@ -834,3 +834,9 @@ export interface FusedDepthwiseConv2DAttrs {
   dimRoundingMode: 'floor'|'round'|'ceil';
   activation: Activation;
 }
+
+export const Zeros = 'Zeros';
+export interface ZerosAttrs {
+  dtype: DataType;
+  shape: number[];
+}

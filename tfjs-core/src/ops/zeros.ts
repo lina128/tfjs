@@ -16,11 +16,14 @@
  */
 
 import {ENGINE} from '../engine';
+import {ZerosAttrs} from '../kernel_names';
 import {Tensor} from '../tensor';
 import {DataType, Rank, ShapeMap} from '../types';
 import {makeZerosTypedArray, sizeFromShape} from '../util';
 
 import {complex} from './complex';
+import {op} from './operation';
+
 
 /**
  * Creates a `tf.Tensor` with all elements set to 0.
@@ -34,13 +37,11 @@ import {complex} from './complex';
  *     be 'float32', 'int32' or 'bool'. Defaults to 'float'.
  */
 /** @doc {heading: 'Tensors', subheading: 'Creation'} */
-export function zeros<R extends Rank>(
+export function zeros_<R extends Rank>(
     shape: ShapeMap[R], dtype: DataType = 'float32'): Tensor<R> {
-  if (dtype === 'complex64') {
-    const real = zeros(shape, 'float32');
-    const imag = zeros(shape, 'float32');
-    return complex(real, imag);
-  }
-  const values = makeZerosTypedArray(sizeFromShape(shape), dtype);
-  return ENGINE.makeTensor(values, shape, dtype) as Tensor<R>;
+  const attrs: ZerosAttrs = {dtype, shape};
+
+  return ENGINE.runKernel(Zeros, {}, attrs as {} as NamedAttrMap);
 }
+
+export const zeros = op({zeros_});
