@@ -19,7 +19,6 @@
 // the contents of this file and import only the kernels that are needed.
 import {KernelConfig, registerKernel} from '@tensorflow/tfjs-core';
 
-import {addConfig} from './kernels/Add';
 import {castConfig} from './kernels/Cast';
 import {complexConfig} from './kernels/Complex';
 import {dilation2dConfig} from './kernels/Dilation2D';
@@ -31,7 +30,6 @@ import {imagConfig} from './kernels/Imag';
 import {intConfig} from './kernels/Int';
 import {maxConfig} from './kernels/Max';
 import {maxPoolWithArgmaxConfig} from './kernels/MaxPoolWithArgmax';
-import {multiplyConfig} from './kernels/Multiply';
 import {nonMaxSuppressionV4Config} from './kernels/NonMaxSuppressionV4';
 import {nonMaxSuppressionV5Config} from './kernels/NonMaxSuppressionV5';
 import {notEqualConfig} from './kernels/NotEqual';
@@ -39,13 +37,11 @@ import {realConfig} from './kernels/Real';
 import {rotateWithOffsetConfig} from './kernels/RotateWithOffset';
 import {squareConfig} from './kernels/Square';
 import {squaredDifferenceConfig} from './kernels/SquaredDifference';
-import {subConfig} from './kernels/Sub';
 import {transposeConfig} from './kernels/Transpose';
 import {zerosConfig} from './kernels/Zeros';
 
 // List all kernel configs here
 const kernelConfigs: KernelConfig[] = [
-  addConfig,
   castConfig,
   complexConfig,
   dilation2dConfig,
@@ -57,7 +53,6 @@ const kernelConfigs: KernelConfig[] = [
   imagConfig,
   maxPoolWithArgmaxConfig,
   maxConfig,
-  multiplyConfig,
   nonMaxSuppressionV4Config,
   nonMaxSuppressionV5Config,
   notEqualConfig,
@@ -65,7 +60,6 @@ const kernelConfigs: KernelConfig[] = [
   rotateWithOffsetConfig,
   squareConfig,
   squaredDifferenceConfig,
-  subConfig,
   transposeConfig,
   zerosConfig
 ];

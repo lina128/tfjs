@@ -401,6 +401,7 @@ export class MathBackendCPU extends KernelBackend {
   }
 
   subtract(a: Tensor, b: Tensor): Tensor {
+    console.log('IN CPUBACKEND subtraction');
     if (a.dtype === 'complex64' || b.dtype === 'complex64') {
       return this.broadcastedBinaryComplexOp(
           a.cast('complex64'), b.cast('complex64'),
