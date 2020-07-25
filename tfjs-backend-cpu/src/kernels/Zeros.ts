@@ -15,12 +15,14 @@
  * =============================================================================
  */
 
-import {KernelConfig, KernelFunc, TensorInfo, util, Zeros, ZerosAttrs} from '@tensorflow/tfjs-core';
+import {KernelConfig, KernelFunc, TensorInfo, TypedArray, util, Zeros, ZerosAttrs} from '@tensorflow/tfjs-core';
+
 import {MathBackendCPU} from '../backend_cpu';
+
 import {complexConfig} from './Complex';
 
-const zeros_: KernelFunc = ({backend, attrs}) => {
-  const {dtype, shape} = attrs as ZerosAttrs;
+const zeros_: KernelFunc = ({inputs = {}, backend, attrs}) => {
+  const {dtype, shape} = attrs as {} as ZerosAttrs;
   const cpuBackend = backend as MathBackendCPU;
 
   if (dtype === 'complex64') {
@@ -34,20 +36,19 @@ const zeros_: KernelFunc = ({backend, attrs}) => {
     const result =
         complexConfig.kernelFunc({inputs: {real, imag}, backend: cpuBackend});
 
-    cpuBackend.disposeData(real.dataId);
-    cpuBackend.disposeData(imag.dataId);
+    cpuBackend.disposeData(real);
+    cpuBackend.disposeData(imag);
 
     return result;
   }
 
-  const values = util.makeZerosTypedArray(util.sizeFromShape(shape), dtype);
+  const values =
+      util.makeZerosTypedArray(util.sizeFromShape(shape), dtype) as TypedArray;
 
   const dataId = cpuBackend.write(values, shape, dtype);
 
   return {dataId, shape, dtype};
 };
-
-const zeros = kernel({zeros_});
 
 export const zerosConfig: KernelConfig = {
   kernelName: Zeros,

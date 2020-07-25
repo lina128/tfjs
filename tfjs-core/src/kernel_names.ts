@@ -835,6 +835,9 @@ export interface FusedDepthwiseConv2DAttrs {
   activation: Activation;
 }
 
+export const Int = 'Int';
+export type IntInputs = Pick<NamedTensorInfoMap, 'x'>;
+
 export const Zeros = 'Zeros';
 export interface ZerosAttrs {
   dtype: DataType;

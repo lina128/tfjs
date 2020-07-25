@@ -56,7 +56,9 @@ export interface TensorData<D extends DataType> {
   // For complex numbers, the real and imaginary parts are stored as their own
   // individual tensors, with a parent joining the two with the
   // complexTensors field.
-  complexTensors?: {real: TensorInfo, imag: TensorInfo};
+  // Todo(linazhao): Remove this field once complex is removed from this file.
+  complexTensors?: {real: Tensor, imag: Tensor};
+  complexInfo?: {real: TensorInfo, imag: TensorInfo};
 }
 
 export class MathBackendCPU extends KernelBackend {
@@ -107,12 +109,20 @@ export class MathBackendCPU extends KernelBackend {
     return this.readSync(dataId);
   }
   readSync(dataId: DataId): backend_util.BackendValues {
-    const {dtype, complexTensors} = this.data.get(dataId);
+    const {dtype, complexTensors, complexInfo} = this.data.get(dataId);
     if (dtype === 'complex64') {
-      const realValues =
-          this.readSync(complexTensors.real.dataId) as Float32Array;
-      const imagValues =
-          this.readSync(complexTensors.imag.dataId) as Float32Array;
+      let realValues;
+      let imagValues;
+      if (complexTensors != null) {
+        realValues = this.readSync(complexTensors.real.dataId) as Float32Array;
+        imagValues = this.readSync(complexTensors.imag.dataId) as Float32Array;
+      } else if (complexInfo != null) {
+        realValues = this.readSync(complexInfo.real.dataId) as Float32Array;
+        imagValues = this.readSync(complexInfo.imag.dataId) as Float32Array;
+      } else {
+        throw new Error('Expect complexTensors or complexInfo, but got null');
+      }
+
       return backend_util.mergeRealAndImagArrays(realValues, imagValues);
     }
     return this.data.get(dataId).values;
@@ -140,10 +150,18 @@ export class MathBackendCPU extends KernelBackend {
 
   disposeData(dataId: DataId): void {
     if (this.data.has(dataId)) {
-      const {complexTensors} = this.data.get(dataId);
+      const {complexTensors, complexInfo} = this.data.get(dataId);
+      // Todo(linazhao): Remove complexTensors once complex is removed from
+      // this file.
       if (complexTensors != null) {
         complexTensors.real.dispose();
         complexTensors.imag.dispose();
+      }
+      if (complexInfo != null) {
+        const realId = complexInfo.real.dataId;
+        const imagId = complexInfo.imag.dataId;
+        this.data.delete(realId);
+        this.data.delete(imagId);
       }
       this.data.delete(dataId);
     }
@@ -164,6 +182,34 @@ export class MathBackendCPU extends KernelBackend {
           ['The reported memory is an upper bound. Due to automatic garbage ' +
            'collection, the true allocated memory may be less.']
     };
+  }
+
+  // Todo(linazhao): Remove complex once broadcastedBinaryComplexOp is removed
+  // from this file, which requires all the kernels referencing the method is
+  // removed from this file.
+  complex<T extends Tensor>(real: T, imag: T): T {
+    const result = this.makeOutput(null, real.shape, 'complex64');
+
+    const resultData = this.data.get(result.dataId);
+    // The backend owns the reference to the underlying real and imaginary
+    // clones. These will explicitly get disposed when the complex tensor is
+    // disposed.
+    resultData.complexTensors = {
+      real: engine().keep(real.clone()),
+      imag: engine().keep(imag.clone())
+    };
+
+    return result as T;
+  }
+  // Todo(linazhao): Remove once complex is removed from this file.
+  real<T extends Tensor>(input: T): T {
+    const resultData = this.data.get(input.dataId);
+    return resultData.complexTensors.real.clone() as T;
+  }
+  // Todo(linazhao): Remove once complex is removed from this file.
+  imag<T extends Tensor>(input: T): T {
+    const resultData = this.data.get(input.dataId);
+    return resultData.complexTensors.imag.clone() as T;
   }
 
   slice<T extends Tensor>(x: T, begin: number[], size: number[]): T {
@@ -1150,17 +1196,6 @@ export class MathBackendCPU extends KernelBackend {
       resultValues[i] = Math.hypot(real, imag);
     }
     return this.makeOutput(resultValues, x.shape, 'float32');
-  }
-
-  int<T extends Tensor>(x: T): T {
-    assertNotComplex(x, 'int');
-
-    const resultValues = new Int32Array(x.size);
-    const values = this.readSync(x.dataId) as TypedArray;
-    for (let i = 0; i < values.length; ++i) {
-      resultValues[i] = values[i];
-    }
-    return this.makeOutput(resultValues, x.shape, 'int32');
   }
 
   sigmoid<T extends Tensor>(x: T): T {
@@ -3294,6 +3329,8 @@ export class MathBackendCPU extends KernelBackend {
     return result.toTensor();
   }
 
+  // Todo(linazhao): Remove after all the kernels referencing this method is
+  // removed from this file.
   private broadcastedBinaryComplexOp(
       a: Tensor, b: Tensor,
       op:

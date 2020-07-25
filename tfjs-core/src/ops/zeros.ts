@@ -16,13 +16,13 @@
  */
 
 import {ENGINE} from '../engine';
-import {ZerosAttrs} from '../kernel_names';
+import {Zeros, ZerosAttrs} from '../kernel_names';
+import {NamedAttrMap} from '../kernel_registry';
 import {Tensor} from '../tensor';
 import {DataType, Rank, ShapeMap} from '../types';
-import {makeZerosTypedArray, sizeFromShape} from '../util';
 
-import {complex} from './complex';
 import {op} from './operation';
+
 
 
 /**
@@ -41,7 +41,7 @@ export function zeros_<R extends Rank>(
     shape: ShapeMap[R], dtype: DataType = 'float32'): Tensor<R> {
   const attrs: ZerosAttrs = {dtype, shape};
 
-  return ENGINE.runKernel(Zeros, {}, attrs as {} as NamedAttrMap);
+  return ENGINE.runKernel(Zeros, {}, attrs as {} as NamedAttrMap) as Tensor<R>;
 }
 
 export const zeros = op({zeros_});

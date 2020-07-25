@@ -318,6 +318,7 @@ export class Tensor<R extends Rank = Rank> {
   /** @doc {heading: 'Tensors', subheading: 'Classes'} */
   async data<D extends DataType = NumericDataType>(): Promise<DataTypeMap[D]> {
     this.throwIfDisposed();
+
     const data = trackerFn().read(this.dataId);
     if (this.dtype === 'string') {
       const bytes = await data as Uint8Array[];

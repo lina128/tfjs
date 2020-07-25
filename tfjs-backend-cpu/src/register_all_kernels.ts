@@ -19,28 +19,55 @@
 // the contents of this file and import only the kernels that are needed.
 import {KernelConfig, registerKernel} from '@tensorflow/tfjs-core';
 
+import {addConfig} from './kernels/Add';
+import {castConfig} from './kernels/Cast';
 import {complexConfig} from './kernels/Complex';
 import {dilation2dConfig} from './kernels/Dilation2D';
 import {dilation2dBackpropFilterConfig} from './kernels/Dilation2DBackpropFilter';
 import {dilation2dBackpropInputConfig} from './kernels/Dilation2DBackpropInput';
 import {divConfig} from './kernels/Div';
 import {identityConfig} from './kernels/Identity';
+import {imagConfig} from './kernels/Imag';
+import {intConfig} from './kernels/Int';
 import {maxConfig} from './kernels/Max';
 import {maxPoolWithArgmaxConfig} from './kernels/MaxPoolWithArgmax';
+import {multiplyConfig} from './kernels/Multiply';
 import {nonMaxSuppressionV4Config} from './kernels/NonMaxSuppressionV4';
 import {nonMaxSuppressionV5Config} from './kernels/NonMaxSuppressionV5';
+import {notEqualConfig} from './kernels/NotEqual';
+import {realConfig} from './kernels/Real';
 import {rotateWithOffsetConfig} from './kernels/RotateWithOffset';
 import {squareConfig} from './kernels/Square';
 import {squaredDifferenceConfig} from './kernels/SquaredDifference';
+import {subConfig} from './kernels/Sub';
 import {transposeConfig} from './kernels/Transpose';
+import {zerosConfig} from './kernels/Zeros';
 
 // List all kernel configs here
 const kernelConfigs: KernelConfig[] = [
-  complexConfig, dilation2dConfig, dilation2dBackpropInputConfig,
-  dilation2dBackpropFilterConfig, divConfig, identityConfig,
-  maxPoolWithArgmaxConfig, maxConfig, nonMaxSuppressionV4Config,
-  nonMaxSuppressionV5Config, rotateWithOffsetConfig, squareConfig,
-  squaredDifferenceConfig, transposeConfig
+  addConfig,
+  castConfig,
+  complexConfig,
+  dilation2dConfig,
+  dilation2dBackpropInputConfig,
+  dilation2dBackpropFilterConfig,
+  divConfig,
+  identityConfig,
+  intConfig,
+  imagConfig,
+  maxPoolWithArgmaxConfig,
+  maxConfig,
+  multiplyConfig,
+  nonMaxSuppressionV4Config,
+  nonMaxSuppressionV5Config,
+  notEqualConfig,
+  realConfig,
+  rotateWithOffsetConfig,
+  squareConfig,
+  squaredDifferenceConfig,
+  subConfig,
+  transposeConfig,
+  zerosConfig
 ];
 
 for (const kernelConfig of kernelConfigs) {

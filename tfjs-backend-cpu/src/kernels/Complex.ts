@@ -27,17 +27,15 @@ export const complexConfig: KernelConfig = {
     const {real, imag} = inputs as ComplexInputs;
     const cpuBackend = backend as MathBackendCPU;
 
-    // Clone the real and imag parts.
-    const $real =
-        identityConfig.kernelFunc({inputs: {real}, backend}) as TensorInfo;
-    const $imag =
-        identityConfig.kernelFunc({inputs: {imag}, backend}) as TensorInfo;
-
     const dataId = cpuBackend.write(null, real.shape, 'complex64');
     const out = cpuBackend.data.get(dataId);
 
-    // Store the real and imag info in complexTensors.
-    out.complexTensors = {real: $real, imag: $imag};
+    const $real =
+        identityConfig.kernelFunc({inputs: {x: real}, backend}) as TensorInfo;
+    const $imag =
+        identityConfig.kernelFunc({inputs: {x: imag}, backend}) as TensorInfo;
+
+    out.complexInfo = {real: $real, imag: $imag};
 
     return {dataId, shape: real.shape, dtype: 'complex64'};
   }
