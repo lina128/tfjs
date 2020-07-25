@@ -1324,6 +1324,22 @@ describeWithFlags('tensor', ALL_ENVS, () => {
     expectArraysEqual(await result.data(), [true, false]);
   });
 
+  it('cast float32 -> complex64', async () => {
+    const a = tf.tensor1d([1, 2]);
+    const result = a.cast('complex64');
+
+    expect(result.dtype).toEqual('complex64');
+    expectArraysClose(await result.data(), [1.0, 0.0, 2.0, 0.0]);
+  });
+
+  it('cast int32 -> complex64', async () => {
+    const a = tf.tensor1d([1, 2], 'int32');
+    const result = a.cast('complex64');
+
+    expect(result.dtype).toEqual('complex64');
+    expectArraysEqual(await result.data(), [1, 0, 2, 0]);
+  });
+
   it('cast throws when passed a non-tensor', () => {
     expect(() => tf.cast({} as tf.Tensor, 'float32'))
         .toThrowError(/Argument 'x' passed to 'cast' must be a Tensor/);

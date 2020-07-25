@@ -15,12 +15,13 @@
  * =============================================================================
  */
 
-import {KernelConfig, TypedArray} from '@tensorflow/tfjs-core';
-
+import {KernelConfig, TypedArray, util} from '@tensorflow/tfjs-core';
 import {Transpose, TransposeAttrs, TransposeInputs} from '@tensorflow/tfjs-core';
+
 import {MathBackendCPU} from '../backend_cpu';
 import {assertNotComplex} from '../cpu_util';
 
+import {identityConfig} from './Identity';
 import {transposeImpl} from './Transpose_impl';
 
 export const transposeConfig: KernelConfig = {
@@ -34,6 +35,25 @@ export const transposeConfig: KernelConfig = {
     assertNotComplex(x, 'transpose');
 
     const xRank = x.shape.length;
+
+    let $perm = perm;
+    if (perm == null) {
+      $perm = x.shape.map((s, i) => i).reverse();
+    }
+    util.assert(
+        xRank === $perm.length,
+        () => `Error in transpose: rank of input ${xRank} ` +
+            `must match length of perm ${$perm}.`);
+    $perm.forEach(axis => {
+      util.assert(
+          axis >= 0 && axis < xRank,
+          () => `All entries in 'perm' must be between 0 and ${xRank - 1}` +
+              ` but got ${$perm}`);
+    });
+
+    if (xRank <= 1) {
+      return identityConfig.kernelFunc({inputs: {x}, backend});
+    }
 
     const newShape: number[] = new Array(xRank);
     for (let i = 0; i < newShape.length; i++) {

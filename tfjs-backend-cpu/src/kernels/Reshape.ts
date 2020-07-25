@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2020 Google LLC. All Rights Reserved.
+ * Copyright 2019 Google LLC. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,29 +15,30 @@
  * =============================================================================
  */
 
-import {Complex, ComplexInputs, TensorInfo} from '@tensorflow/tfjs-core';
+import {Reshape, ReshapeAttrs, ReshapeInputs} from '@tensorflow/tfjs-core';
 import {KernelConfig} from '@tensorflow/tfjs-core';
-import {MathBackendCPU} from '../backend_cpu';
-import {identityConfig} from './Identity';
 
-export const complexConfig: KernelConfig = {
-  kernelName: Complex,
+import {MathBackendCPU} from '../backend_cpu';
+
+export const reshapeConfig: KernelConfig = {
+  kernelName: Reshape,
   backendName: 'cpu',
-  kernelFunc: ({inputs, backend}) => {
-    console.log('HELLO WORLD COMPLEX');
-    const {real, imag} = inputs as ComplexInputs;
+  kernelFunc: ({inputs, backend, attrs}) => {
+    console.log('HELLO WORLD RESHAPE');
+    const {x} = inputs as ReshapeInputs;
+    const {shape} = attrs as {} as ReshapeAttrs;
     const cpuBackend = backend as MathBackendCPU;
 
-    const dataId = cpuBackend.write(null, real.shape, 'complex64');
-    const out = cpuBackend.data.get(dataId);
+    const {values, complexInfo} = cpuBackend.data.get(x.dataId);
 
-    const $real =
-        identityConfig.kernelFunc({inputs: {x: real}, backend}) as TensorInfo;
-    const $imag =
-        identityConfig.kernelFunc({inputs: {x: imag}, backend}) as TensorInfo;
+    const outId = cpuBackend.write(values, shape, x.dtype);
 
-    out.complexInfo = {real: $real, imag: $imag};
+    if (complexInfo != null) {
+      console.log('HAS COMPLEXINFO');
+      const out = cpuBackend.data.get(outId);
+      out.complexInfo = complexInfo;
+    }
 
-    return {dataId, shape: real.shape, dtype: 'complex64'};
+    return {dataId: outId, shape, dtype: x.dtype};
   }
 };

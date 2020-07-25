@@ -22,7 +22,6 @@ import {Tensor} from '../tensor';
 import {NamedTensorMap} from '../tensor_types';
 import {convertToTensor} from '../tensor_util_env';
 import {TensorLike} from '../types';
-import * as util from '../util';
 
 import {op} from './operation';
 
@@ -46,24 +45,6 @@ import {op} from './operation';
 /** @doc {heading: 'Operations', subheading: 'Matrices'} */
 function transpose_<T extends Tensor>(x: T|TensorLike, perm?: number[]): T {
   const $x = convertToTensor(x, 'x', 'transpose');
-
-  if (perm == null) {
-    perm = $x.shape.map((s, i) => i).reverse();
-  }
-  util.assert(
-      $x.rank === perm.length,
-      () => `Error in transpose: rank of input ${$x.rank} ` +
-          `must match length of perm ${perm}.`);
-  perm.forEach(axis => {
-    util.assert(
-        axis >= 0 && axis < $x.rank,
-        () => `All entries in 'perm' must be between 0 and ${$x.rank - 1}` +
-            ` but got ${perm}`);
-  });
-
-  if ($x.rank <= 1) {
-    return $x.clone();
-  }
 
   const inputs: TransposeInputs = {x: $x};
   const attrs: TransposeAttrs = {perm};

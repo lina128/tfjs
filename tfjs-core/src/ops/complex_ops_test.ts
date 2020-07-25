@@ -150,20 +150,20 @@ describeWithFlags('complex64 memory', ALL_ENVS, () => {
     expect(tf.memory().numTensors).toEqual(numTensors);
   });
 
-  it('reshape', async () => {
+  fit('reshape', async () => {
     const memoryBefore = tf.memory();
 
     const a = tf.complex([[1, 3, 5], [7, 9, 11]], [[2, 4, 6], [8, 10, 12]]);
 
-    // 3 new tensors, the complex64 tensor and the 2 underlying float32 tensors.
-    expect(tf.memory().numTensors).toBe(memoryBefore.numTensors + 3);
+    // 1 new tensor, the complex64 tensor.
+    expect(tf.memory().numTensors).toBe(memoryBefore.numTensors + 1);
     // Bytes should be counted once.
     expect(tf.memory().numBytes)
         .toBe(memoryBefore.numBytes + 6 * BYTES_PER_COMPLEX_ELEMENT);
 
     const b = a.reshape([6]);
     // 1 new tensor from the reshape.
-    expect(tf.memory().numTensors).toBe(memoryBefore.numTensors + 4);
+    expect(tf.memory().numTensors).toBe(memoryBefore.numTensors + 2);
     // No new bytes from a reshape.
     expect(tf.memory().numBytes)
         .toBe(memoryBefore.numBytes + 6 * BYTES_PER_COMPLEX_ELEMENT);
@@ -174,8 +174,9 @@ describeWithFlags('complex64 memory', ALL_ENVS, () => {
 
     b.dispose();
     // 1 complex tensor should be disposed.
-    expect(tf.memory().numTensors).toBe(memoryBefore.numTensors + 3);
-    // Byte count should not change because the refcounts are all 1.
+    expect(tf.memory().numTensors).toBe(memoryBefore.numTensors + 1);
+    // Byte count should not change because there is still another tensor
+    // referencing it.
     expect(tf.memory().numBytes)
         .toBe(memoryBefore.numBytes + 6 * BYTES_PER_COMPLEX_ELEMENT);
 

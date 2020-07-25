@@ -47,12 +47,13 @@ export function broadcastedBinaryOp(
   } else {
     const aStrides = util.computeStrides(aShape);
     const bStrides = util.computeStrides(bShape);
+    const outStrides = util.computeStrides(newShape);
 
     for (let i = 0; i < resVals.length; ++i) {
       const aIndex = convertBroadcastedIndexToOriginalIndex(
-          i, aShape, aBroadcastDims, aStrides);
+          i, aShape, aBroadcastDims, aStrides, newShape, outStrides);
       const bIndex = convertBroadcastedIndexToOriginalIndex(
-          i, bShape, bBroadcastDims, bStrides);
+          i, bShape, bBroadcastDims, bStrides, newShape, outStrides);
 
       resVals[i] = op(aVals[aIndex], bVals[bIndex]);
     }
@@ -93,12 +94,13 @@ export function broadcastedBinaryComplexOp(
   } else {
     const aStrides = util.computeStrides(aShape);
     const bStrides = util.computeStrides(bShape);
+    const outStrides = util.computeStrides(newShape);
 
     for (let i = 0; i < realVals.length; i++) {
       const aIndex = convertBroadcastedIndexToOriginalIndex(
-          i, aShape, aBroadcastDims, aStrides);
+          i, aShape, aBroadcastDims, aStrides, newShape, outStrides);
       const bIndex = convertBroadcastedIndexToOriginalIndex(
-          i, bShape, bBroadcastDims, bStrides);
+          i, bShape, bBroadcastDims, bStrides, newShape, outStrides);
 
       const opResult =
           op(aRealVals[aIndex], aImagVals[aIndex], bRealVals[bIndex],
@@ -114,9 +116,8 @@ export function broadcastedBinaryComplexOp(
 
 function convertBroadcastedIndexToOriginalIndex(
     broadCastedIndex: number, shape: number[], originalBroadcastDims: number[],
-    strides: number[]): number {
-  const coord = convertIndexToCoord(broadCastedIndex, shape, strides);
-
+    strides: number[], outShape: number[], outStrides: number[]): number {
+  const coord = convertIndexToCoord(broadCastedIndex, outShape, outStrides);
   const originalCoord = coord.slice(-shape.length);
 
   originalBroadcastDims.forEach(d => originalCoord[d] = 0);

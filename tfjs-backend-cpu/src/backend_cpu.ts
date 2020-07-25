@@ -18,7 +18,7 @@
 import * as tf from '@tensorflow/tfjs-core';
 import {engine, env, TensorInfo} from '@tensorflow/tfjs-core';
 import {backend_util, buffer, slice_util, util} from '@tensorflow/tfjs-core';
-import {BackendTimingInfo, DataStorage, DataType, DataValues, KernelBackend, max, NumericDataType, Rank, reshape, Scalar, ShapeMap, Tensor, Tensor1D, Tensor2D, Tensor3D, Tensor4D, Tensor5D, TensorBuffer, TypedArray, upcastType} from '@tensorflow/tfjs-core';
+import {BackendTimingInfo, DataStorage, DataType, DataValues, KernelBackend, NumericDataType, Rank, reshape, Scalar, ShapeMap, Tensor, Tensor1D, Tensor2D, Tensor4D, Tensor5D, TensorBuffer, TypedArray, upcastType} from '@tensorflow/tfjs-core';
 import {kernel_impls} from '@tensorflow/tfjs-core';
 
 const nonMaxSuppressionV3Impl = kernel_impls.nonMaxSuppressionV3Impl;
@@ -32,23 +32,24 @@ import {maxPoolPositions, pool} from './utils/pool_utils';
 
 interface DataId {}
 
-function mapActivation(
-    backend: MathBackendCPU, x: Tensor, activation: backend_util.Activation,
-    preluActivationWeights?: Tensor): Tensor {
-  if (activation === 'linear') {
-    return backend.linear(x);
-  } else if (activation === 'relu') {
-    return backend.relu(x);
-  } else if (activation === 'elu') {
-    return backend.elu(x);
-  } else if (activation === 'relu6') {
-    return backend.relu6(x);
-  } else if (activation === 'prelu') {
-    return backend.prelu(x, preluActivationWeights);
-  }
-  throw new Error(
-      `Activation ${activation} has not been implemented for the CPU backend.`);
-}
+// function mapActivation(
+//     backend: MathBackendCPU, x: Tensor, activation: backend_util.Activation,
+//     preluActivationWeights?: Tensor): Tensor {
+//   if (activation === 'linear') {
+//     return backend.linear(x);
+//   } else if (activation === 'relu') {
+//     return backend.relu(x);
+//   } else if (activation === 'elu') {
+//     return backend.elu(x);
+//   } else if (activation === 'relu6') {
+//     return backend.relu6(x);
+//   } else if (activation === 'prelu') {
+//     return backend.prelu(x, preluActivationWeights);
+//   }
+//   throw new Error(
+//       `Activation ${activation} has not been implemented for the CPU
+//       backend.`);
+// }
 
 export interface TensorData<D extends DataType> {
   values?: backend_util.BackendValues;
@@ -349,26 +350,6 @@ export class MathBackendCPU extends KernelBackend {
     return tf.tensor(values, finalOutShape, tensors[0].dtype);
   }
 
-  neg<T extends Tensor>(x: T): T {
-    assertNotComplex(x, 'neg');
-
-    return this.multiply(tf.scalar(-1), x) as T;
-  }
-
-  add(a: Tensor, b: Tensor): Tensor {
-    if (a.dtype === 'complex64' || b.dtype === 'complex64') {
-      return this.broadcastedBinaryComplexOp(
-          a.cast('complex64'), b.cast('complex64'),
-          (aReal, aImag, bReal, bImag) => {
-            return {real: aReal + bReal, imag: aImag + bImag};
-          });
-    }
-
-    return this.broadcastedBinaryOp(
-        a, b, upcastType(a.dtype, b.dtype),
-        (aValue, bValue) => aValue + bValue);
-  }
-
   addN<T extends Tensor>(tensors: T[]): T {
     assertNotComplex(tensors, 'addN');
 
@@ -384,37 +365,6 @@ export class MathBackendCPU extends KernelBackend {
     return result.toTensor() as T;
   }
 
-  softmax<T extends Tensor>(logits: T, dim: number): T {
-    const axes = util.parseAxisParam([dim], logits.shape);
-    // TODO(annxingyuan): Call maxImpl rather than op as part of softmax kernel
-    // modularization.
-    const maxLogit = max(logits, axes);
-    const expandedShape =
-        backend_util.expandShapeToKeepDim(maxLogit.shape, axes);
-    const a = this.subtract(logits, maxLogit.reshape(expandedShape));
-    const b = this.exp(a);
-    const sumExp = this.sum(b, axes).reshape(expandedShape);
-
-    // TODO(annxingyuan): Call divImpl rather than op as part of softmax
-    // kernel modularization.
-    return tf.div(b, sumExp);
-  }
-
-  subtract(a: Tensor, b: Tensor): Tensor {
-    console.log('IN CPUBACKEND subtraction');
-    if (a.dtype === 'complex64' || b.dtype === 'complex64') {
-      return this.broadcastedBinaryComplexOp(
-          a.cast('complex64'), b.cast('complex64'),
-          (aReal, aImag, bReal, bImag) => {
-            return {real: aReal - bReal, imag: aImag - bImag};
-          });
-    }
-
-    return this.broadcastedBinaryOp(
-        a, b, upcastType(a.dtype, b.dtype),
-        (aValue, bValue) => aValue - bValue);
-  }
-
   pow<T extends Tensor>(a: T, b: Tensor): T {
     assertNotComplex([a, b], 'pow');
 
@@ -423,118 +373,12 @@ export class MathBackendCPU extends KernelBackend {
         T;
   }
 
-  batchMatMul(
-      a: Tensor3D, b: Tensor3D, transposeA: boolean,
-      transposeB: boolean): Tensor3D {
-    assertNotComplex([a, b], 'matMul');
-
-    const sharedDim = transposeA ? a.shape[1] : a.shape[2];
-    const leftDim = transposeA ? a.shape[2] : a.shape[1];
-    const rightDim = transposeB ? b.shape[1] : b.shape[2];
-    const batchDim = a.shape[0];
-
-    const aValues = this.readSync(a.dataId) as TypedArray;
-    const bValues = this.readSync(b.dataId) as TypedArray;
-    const [aBatch, aOuterStep, aInnerStep] = transposeA ?
-        [a.strides[0], 1, a.strides[1]] :
-        [a.strides[0], a.strides[1], 1];
-    const [bInnerStep, bOuterStep, bBatch] = transposeB ?
-        [1, b.strides[1], b.strides[0]] :
-        [b.strides[1], 1, b.strides[0]];
-
-    const size = leftDim * rightDim;
-    const result = tf.buffer([batchDim, leftDim, rightDim], a.dtype);
-    const resVals = result.values as TypedArray;
-    const blockSize = this.blockSize;
-
-    for (let b = 0; b < batchDim; b++) {
-      for (let i0 = 0; i0 < leftDim; i0 += blockSize) {
-        for (let j0 = 0; j0 < rightDim; j0 += blockSize) {
-          for (let k0 = 0; k0 < sharedDim; k0 += blockSize) {
-            // for when blockSize doesn't evenly divide the input
-            const iBlock = Math.min(i0 + blockSize, leftDim);
-            const jBlock = Math.min(j0 + blockSize, rightDim);
-            const kBlock = Math.min(k0 + blockSize, sharedDim);
-
-            for (let i = i0; i < iBlock; i++) {
-              for (let j = j0; j < jBlock; j++) {
-                let sum = 0.0;
-
-                for (let k = k0; k < kBlock; k++) {
-                  sum += aValues[b * aBatch + i * aOuterStep + k * aInnerStep] *
-                      bValues[k * bInnerStep + j * bOuterStep + b * bBatch];
-                }
-                resVals[b * size + (i * rightDim + j)] += sum;
-              }
-            }
-          }
-        }
-      }
-    }
-    return result.toTensor() as Tensor3D;
-  }
-
-  fusedBatchMatMul(
-      {a, b, transposeA, transposeB, bias, activation, preluActivationWeights}:
-          backend_util.FusedBatchMatMulConfig): Tensor3D {
-    let result = this.batchMatMul(a, b, transposeA, transposeB);
-    if (bias) {
-      result = this.add(result, bias) as Tensor3D;
-    }
-    if (activation) {
-      result =
-          mapActivation(this, result, activation, preluActivationWeights) as
-          Tensor3D;
-    }
-    return result;
-  }
-
-  multiply(a: Tensor, b: Tensor): Tensor {
-    if (a.dtype === 'complex64' || b.dtype === 'complex64') {
-      return this.broadcastedBinaryComplexOp(
-          a.cast('complex64'), b.cast('complex64'),
-          (aReal, aImag, bReal, bImag) => {
-            return {
-              real: aReal * bReal - aImag * bImag,
-              imag: aReal * bImag + aImag * bReal
-            };
-          });
-    }
-
-    return this.broadcastedBinaryOp(
-        a, b, upcastType(a.dtype, b.dtype),
-        (aValue, bValue) => aValue * bValue);
-  }
-
   floorDiv(a: Tensor, b: Tensor): Tensor {
     assertNotComplex([a, b], 'floorDiv');
 
     const op = (a: number, b: number) => Math.floor(a / b);
     const outputDtype = 'int32';
     return this.broadcastedBinaryOp(a, b, outputDtype, op);
-  }
-
-  sum(x: Tensor, axes: number[]): Tensor {
-    assertNotComplex(x, 'sum');
-
-    backend_util.assertAxesAreInnerMostDims('sum', axes, x.rank);
-    const [outShape, reduceShape] =
-        backend_util.computeOutAndReduceShapes(x.shape, axes);
-    const resultDtype = upcastType(x.dtype, 'int32');
-    const result = tf.zeros(outShape, resultDtype);
-    const reduceSize = util.sizeFromShape(reduceShape);
-    const vals = this.readSync(result.dataId) as TypedArray;
-
-    const aVals = this.readSync(x.dataId) as TypedArray;
-    for (let i = 0; i < vals.length; ++i) {
-      const offset = i * reduceSize;
-      let sum = 0;
-      for (let j = 0; j < reduceSize; ++j) {
-        sum += aVals[offset + j];
-      }
-      vals[i] = sum;
-    }
-    return result;
   }
 
   prod(x: Tensor, axes: number[]): Tensor {
@@ -994,17 +838,6 @@ export class MathBackendCPU extends KernelBackend {
     return this.makeOutput(newValues, x.shape, 'float32');
   }
 
-  exp<T extends Tensor>(x: T): T {
-    assertNotComplex(x, 'exp');
-
-    const values = this.readSync(x.dataId) as TypedArray;
-    const newValues = new Float32Array(values.length);
-    for (let i = 0; i < values.length; ++i) {
-      newValues[i] = Math.exp(values[i]);
-    }
-    return this.makeOutput(newValues, x.shape, 'float32');
-  }
-
   expm1<T extends Tensor>(x: T): T {
     assertNotComplex(x, 'expm1');
 
@@ -1427,89 +1260,6 @@ export class MathBackendCPU extends KernelBackend {
     return this.makeOutput(resultValues, x.shape, 'float32');
   }
 
-  fusedConv2d(
-      {input, filter, convInfo, bias, activation, preluActivationWeights}:
-          backend_util.FusedConv2DConfig): Tensor4D {
-    let result = this.conv2d(input, filter, convInfo);
-
-    if (bias) {
-      result = this.add(result, bias) as Tensor4D;
-    }
-    if (activation) {
-      result =
-          mapActivation(this, result, activation, preluActivationWeights) as
-          Tensor4D;
-    }
-    return result;
-  }
-
-  conv2d(x: Tensor4D, filter: Tensor4D, convInfo: backend_util.Conv2DInfo):
-      Tensor4D {
-    assertNotComplex([x, filter], 'conv2d');
-
-    const filterHeight = convInfo.filterHeight;
-    const filterWidth = convInfo.filterWidth;
-    const dilationHeight = convInfo.dilationHeight;
-    const dilationWidth = convInfo.dilationWidth;
-    const padLeft = convInfo.padInfo.left;
-    const padTop = convInfo.padInfo.top;
-    const isChannelsLast = convInfo.dataFormat === 'channelsLast';
-
-    const y = tf.buffer(convInfo.outShape, x.dtype as 'float32');
-
-    const xBatchStride = x.strides[0];
-    const xRowStride = isChannelsLast ? x.strides[1] : x.strides[2];
-    const xColStride = isChannelsLast ? x.strides[2] : 1;
-    const xChannelStride = isChannelsLast ? 1 : x.strides[1];
-    const yBatchStride = y.strides[0];
-    const yRowStride = isChannelsLast ? y.strides[1] : y.strides[2];
-    const yColStride = isChannelsLast ? y.strides[2] : 1;
-    const yChannelStride = isChannelsLast ? 1 : y.strides[1];
-
-    const xVals = this.readSync(x.dataId) as TypedArray;
-    const wVals = this.readSync(filter.dataId) as TypedArray;
-    const yVals = y.values;
-
-    for (let b = 0; b < convInfo.batchSize; ++b) {
-      const xOffset1 = b * xBatchStride;
-      const yOffset1 = b * yBatchStride;
-      for (let yR = 0; yR < convInfo.outHeight; ++yR) {
-        const yOffset2 = yOffset1 + yR * yRowStride;
-        const xRCorner = yR * convInfo.strideHeight - padTop;
-        for (let wR = 0; wR < filterHeight; wR++) {
-          const xR = xRCorner + wR * dilationHeight;
-          if (xR < 0 || xR >= convInfo.inHeight) {
-            continue;
-          }
-          const wOffset1 = wR * filter.strides[0];
-          const xOffset2 = xOffset1 + xR * xRowStride;
-          for (let yC = 0; yC < convInfo.outWidth; ++yC) {
-            const yOffset3 = yOffset2 + yC * yColStride;
-            const xCCorner = yC * convInfo.strideWidth - padLeft;
-            for (let wC = 0; wC < filterWidth; wC++) {
-              const xC = xCCorner + wC * dilationWidth;
-              if (xC < 0 || xC >= convInfo.inWidth) {
-                continue;
-              }
-              const wOffset2 = wOffset1 + wC * filter.strides[1];
-              const xOffset3 = xOffset2 + xC * xColStride;
-              let wOffset3 = wOffset2;
-              for (let d1 = 0; d1 < convInfo.inChannels; ++d1) {
-                const xVal = xVals[xOffset3 + d1 * xChannelStride];
-                for (let d2 = 0; d2 < convInfo.outChannels; ++d2) {
-                  yVals[yOffset3 + d2 * yChannelStride] +=
-                      xVal * wVals[wOffset3 + d2];
-                }
-                wOffset3 += convInfo.outChannels;
-              }
-            }
-          }
-        }
-      }
-    }
-    return y.toTensor() as Tensor4D;
-  }
-
   conv3d(x: Tensor5D, filter: Tensor5D, convInfo: backend_util.Conv3DInfo):
       Tensor5D {
     const filterDepth = convInfo.filterDepth;
@@ -1874,81 +1624,6 @@ export class MathBackendCPU extends KernelBackend {
       }
     }
     return dw.toTensor();
-  }
-
-  fusedDepthwiseConv2D(
-      {input, filter, convInfo, bias, activation, preluActivationWeights}:
-          backend_util.FusedConv2DConfig): Tensor4D {
-    let result = this.depthwiseConv2D(input, filter, convInfo);
-
-    if (bias) {
-      result = this.add(result, bias) as Tensor4D;
-    }
-    if (activation) {
-      result =
-          mapActivation(this, result, activation, preluActivationWeights) as
-          Tensor4D;
-    }
-    return result;
-  }
-
-  depthwiseConv2D(
-      x: Tensor4D, filter: Tensor4D,
-      convInfo: backend_util.Conv2DInfo): Tensor4D {
-    assertNotComplex([x, filter], 'depthwiseConv2D');
-
-    const filterHeight = convInfo.filterHeight;
-    const filterWidth = convInfo.filterWidth;
-    const dilationHeight = convInfo.dilationHeight;
-    const dilationWidth = convInfo.dilationWidth;
-    const padLeft = convInfo.padInfo.left;
-    const padTop = convInfo.padInfo.top;
-    const chMul = convInfo.outChannels / convInfo.inChannels;
-    const y = tf.buffer(convInfo.outShape, x.dtype as 'float32');
-    const xVals = this.readSync(x.dataId) as TypedArray;
-    const wVals = this.readSync(filter.dataId) as TypedArray;
-    const yVals = y.values;
-
-    for (let b = 0; b < convInfo.batchSize; ++b) {
-      const xOffset1 = b * x.strides[0];
-      const yOffset1 = b * y.strides[0];
-      for (let yR = 0; yR < convInfo.outHeight; ++yR) {
-        const yOffset2 = yOffset1 + yR * y.strides[1];
-        const xRCorner = yR * convInfo.strideHeight - padLeft;
-        for (let wR = 0; wR < filterHeight; ++wR) {
-          const xR = xRCorner + wR * dilationHeight;
-          if (xR < 0 || xR >= convInfo.inHeight) {
-            continue;
-          }
-          const wOffset1 = wR * filter.strides[0];
-          const xOffset2 = xOffset1 + xR * x.strides[1];
-          for (let yC = 0; yC < convInfo.outWidth; ++yC) {
-            const yOffset3 = yOffset2 + yC * y.strides[2];
-            const xCCorner = yC * convInfo.strideWidth - padTop;
-            for (let wC = 0; wC < filterWidth; ++wC) {
-              const xC = xCCorner + wC * dilationWidth;
-              if (xC < 0 || xC >= convInfo.inWidth) {
-                continue;
-              }
-              const wOffset2 = wOffset1 + wC * filter.strides[1];
-              const xOffset3 = xOffset2 + xC * convInfo.inChannels;
-              let yOffset4 = yOffset3;
-              let wOffset3 = wOffset2;
-              for (let d1 = 0; d1 < convInfo.inChannels; ++d1) {
-                const xVal = xVals[xOffset3 + d1];
-                for (let q = 0; q < chMul; ++q) {
-                  yVals[yOffset4 + q] += xVal * wVals[wOffset3 + q];
-                }
-                yOffset4 += chMul;
-                wOffset3 += chMul;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    return y.toTensor() as Tensor4D;
   }
 
   depthwiseConv2DDerInput(
@@ -2642,10 +2317,6 @@ export class MathBackendCPU extends KernelBackend {
     return backend_util.castTensor(x, dtype, this);
   }
 
-  reshape<R extends Rank>(x: Tensor, shape: ShapeMap[R]): Tensor<R> {
-    return backend_util.reshapeTensor(x, shape);
-  }
-
   avgPool(x: Tensor4D, convInfo: backend_util.Conv2DInfo): Tensor4D {
     assertNotComplex(x, 'avgPool');
     assertNotComplex(x, 'maxPool');
@@ -3328,64 +2999,6 @@ export class MathBackendCPU extends KernelBackend {
       }
     }
     return result.toTensor();
-  }
-
-  // Todo(linazhao): Remove after all the kernels referencing this method is
-  // removed from this file.
-  private broadcastedBinaryComplexOp(
-      a: Tensor, b: Tensor,
-      op:
-          (aReal: number, aImag: number, bReal: number,
-           bImag: number) => {real: number, imag: number}): Tensor {
-    const newShape = backend_util.assertAndGetBroadcastShape(a.shape, b.shape);
-    const realResult = tf.buffer(newShape, 'float32');
-    const imagResult = tf.buffer(newShape, 'float32');
-
-    const aVals = this.readSync(a.dataId) as TypedArray;
-    const bVals = this.readSync(b.dataId) as TypedArray;
-    const aBroadcastDims = backend_util.getBroadcastDims(a.shape, newShape);
-    const bBroadcastDims = backend_util.getBroadcastDims(b.shape, newShape);
-
-    const realVals = realResult.values;
-    const imagVals = imagResult.values;
-
-    if (aBroadcastDims.length + bBroadcastDims.length === 0) {
-      for (let i = 0; i < realVals.length; i++) {
-        const aIdx = i % aVals.length;
-        const bIdx = i % bVals.length;
-
-        const result =
-            op(aVals[aIdx * 2], aVals[aIdx * 2 + 1], bVals[bIdx * 2],
-               bVals[bIdx * 2 + 1]);
-
-        realVals[i] = result.real;
-        imagVals[i] = result.imag;
-      }
-    } else {
-      const aRealBuf =
-          this.bufferSync(this.data.get(a.dataId).complexTensors.real);
-      const bRealBuf =
-          this.bufferSync(this.data.get(b.dataId).complexTensors.real);
-      for (let i = 0; i < realVals.length; i++) {
-        const loc = realResult.indexToLoc(i);
-
-        const aLoc = loc.slice(-a.rank);
-        aBroadcastDims.forEach(d => aLoc[d] = 0);
-        const aIndex = aRealBuf.locToIndex(aLoc);
-
-        const bLoc = loc.slice(-b.rank);
-        bBroadcastDims.forEach(d => bLoc[d] = 0);
-        const bIndex = bRealBuf.locToIndex(bLoc);
-
-        const opResult =
-            op(aVals[aIndex * 2], aVals[aIndex * 2 + 1], bVals[bIndex * 2],
-               bVals[bIndex * 2 + 1]);
-
-        realVals[i] = opResult.real;
-        imagVals[i] = opResult.imag;
-      }
-    }
-    return this.complex(realResult.toTensor(), imagResult.toTensor());
   }
 
   split<T extends Tensor>(x: T, sizeSplits: number[], axis: number): T[] {

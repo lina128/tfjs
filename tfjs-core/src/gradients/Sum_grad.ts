@@ -28,15 +28,21 @@ export const sumGradConfig: GradConfig = {
   inputsToSave: ['x'],
   gradFunc: (dy: Tensor, saved: Tensor[], attrs: NamedAttrMap) => {
     const [x] = saved;
-    const expandedDyShape = x.shape.slice();
+
+    let $x = x;
+    if ($x.dtype === 'bool') {
+      $x = x.toInt();
+    }
+
+    const expandedDyShape = $x.shape.slice();
     const {axis} = attrs as {} as SumAttrs;
 
-    const axes = parseAxisParam(axis, x.shape);
+    const axes = parseAxisParam(axis, $x.shape);
     axes.forEach(axis => {
       expandedDyShape[axis] = 1;
     });
     const expandedDy = reshape(dy, expandedDyShape);
-    const derX = mul(expandedDy, ones(x.shape, 'float32'));
+    const derX = mul(expandedDy, ones($x.shape, 'float32'));
 
     return {x: () => derX};
   }

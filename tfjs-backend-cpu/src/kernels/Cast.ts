@@ -45,8 +45,8 @@ const cast_: KernelFunc = ({inputs, backend, attrs}) => {
 
     const result = complexConfig.kernelFunc({inputs: {real, imag}, backend});
 
-    cpuBackend.disposeData(real);
-    cpuBackend.disposeData(imag);
+    cpuBackend.disposeData(real.dataId);
+    cpuBackend.disposeData(imag.dataId);
 
     return result;
   }

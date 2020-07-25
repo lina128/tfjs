@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2020 Google LLC. All Rights Reserved.
+ * Copyright 2019 Google LLC. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,29 +15,32 @@
  * =============================================================================
  */
 
-import {Complex, ComplexInputs, TensorInfo} from '@tensorflow/tfjs-core';
+import {Negate, TensorInfo, UnaryInputs} from '@tensorflow/tfjs-core';
 import {KernelConfig} from '@tensorflow/tfjs-core';
-import {MathBackendCPU} from '../backend_cpu';
-import {identityConfig} from './Identity';
 
-export const complexConfig: KernelConfig = {
-  kernelName: Complex,
+import {MathBackendCPU} from '../backend_cpu';
+import {assertNotComplex} from '../cpu_util';
+
+import {multiplyConfig} from './Multiply';
+
+export const negateConfig: KernelConfig = {
+  kernelName: Negate,
   backendName: 'cpu',
   kernelFunc: ({inputs, backend}) => {
-    console.log('HELLO WORLD COMPLEX');
-    const {real, imag} = inputs as ComplexInputs;
+    const {x} = inputs as UnaryInputs;
     const cpuBackend = backend as MathBackendCPU;
 
-    const dataId = cpuBackend.write(null, real.shape, 'complex64');
-    const out = cpuBackend.data.get(dataId);
+    assertNotComplex(x, 'neg');
 
-    const $real =
-        identityConfig.kernelFunc({inputs: {x: real}, backend}) as TensorInfo;
-    const $imag =
-        identityConfig.kernelFunc({inputs: {x: imag}, backend}) as TensorInfo;
+    const minusOne = cpuBackend.write(Float32Array.from([-1]), [], 'float32');
+    const $minusOne:
+        TensorInfo = {dataId: minusOne, shape: [], dtype: 'float32'};
 
-    out.complexInfo = {real: $real, imag: $imag};
+    const result =
+        multiplyConfig.kernelFunc({inputs: {a: $minusOne, b: x}, backend});
 
-    return {dataId, shape: real.shape, dtype: 'complex64'};
+    cpuBackend.disposeData(minusOne);
+
+    return result;
   }
 };

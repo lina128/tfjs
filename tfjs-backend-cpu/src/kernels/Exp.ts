@@ -15,25 +15,31 @@
  * =============================================================================
  */
 
-import {Identity, IdentityInputs, KernelConfig} from '@tensorflow/tfjs-core';
+import {Exp, KernelConfig, KernelFunc, TypedArray, UnaryInputs} from '@tensorflow/tfjs-core';
 
 import {MathBackendCPU} from '../backend_cpu';
+import {assertNotComplex} from '../cpu_util';
 
-export const identityConfig: KernelConfig = {
-  kernelName: Identity,
-  backendName: 'cpu',
-  kernelFunc: ({inputs, backend}) => {
-    const {x} = inputs as IdentityInputs;
-    const cpuBackend = backend as MathBackendCPU;
+const exp: KernelFunc = ({inputs, backend}) => {
+  const {x} = inputs as UnaryInputs;
+  const cpuBackend = backend as MathBackendCPU;
 
-    const {values, complexInfo} = cpuBackend.data.get(x.dataId);
-    const outId = cpuBackend.write(values, x.shape, x.dtype);
+  assertNotComplex(x, 'exp');
 
-    if (complexInfo != null) {
-      const out = cpuBackend.data.get(outId);
-      out.complexInfo = complexInfo;
-    }
+  const values = cpuBackend.data.get(x.dataId).values as TypedArray;
 
-    return {dataId: outId, shape: x.shape, dtype: x.dtype};
+  const newValues = new Float32Array(values.length);
+  for (let i = 0; i < values.length; ++i) {
+    newValues[i] = Math.exp(values[i]);
   }
+
+  const outId = cpuBackend.write(newValues, x.shape, 'float32');
+
+  return {dataId: outId, shape: x.shape, dtype: 'float32'};
+};
+
+export const expConfig: KernelConfig = {
+  kernelName: Exp,
+  backendName: 'cpu',
+  kernelFunc: exp
 };
