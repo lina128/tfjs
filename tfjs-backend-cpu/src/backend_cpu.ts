@@ -2631,10 +2631,6 @@ export class MathBackendCPU extends KernelBackend {
     return backend_util.castTensor(x, dtype, this);
   }
 
-  reshape<R extends Rank>(x: Tensor, shape: ShapeMap[R]): Tensor<R> {
-    return backend_util.reshapeTensor(x, shape);
-  }
-
   avgPool(x: Tensor4D, convInfo: backend_util.Conv2DInfo): Tensor4D {
     assertNotComplex(x, 'avgPool');
     assertNotComplex(x, 'maxPool');
