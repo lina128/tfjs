@@ -3568,40 +3568,6 @@ export class MathBackendCPU extends KernelBackend {
         numUpdates, sliceRank, strides, defaultValue, sumDupeIndices);
   }
 
-  gatherND(x: Tensor, indices: Tensor): Tensor {
-    const indicesShape = indices.shape;
-    const sliceRank = indicesShape[indicesShape.length - 1];
-
-    const [resultShape, numSlices, sliceSize, strides] =
-        backend_util.prepareAndValidate(x, indices);
-    if (numSlices === 0) {
-      return tf.tensor([], resultShape, x.dtype);
-    }
-
-    const buffer = new TensorBuffer([numSlices, sliceSize], x.dtype);
-    const indicesData = this.readSync(indices.dataId) as TypedArray;
-    const xData = this.readSync(x.dataId) as TypedArray;
-
-    for (let i = 0; i < numSlices; i++) {
-      const index = [];
-      let flattenIndex = 0;
-      for (let j = 0; j < sliceRank; j++) {
-        const dim = indicesData[i * sliceRank + j];
-        flattenIndex += dim * strides[j];
-        index.push(dim);
-      }
-      if (flattenIndex < 0 || flattenIndex >= x.size / sliceSize) {
-        throw new Error(
-            `Invalid indices: ${index} does not index into ${x.shape}`);
-      }
-
-      for (let k = 0; k < sliceSize; k++) {
-        buffer.values[i * sliceSize + k] = xData[flattenIndex * sliceSize + k];
-      }
-    }
-    return buffer.toTensor().reshape(resultShape);
-  }
-
   scatterND<R extends Rank>(
       indices: Tensor, updates: Tensor, shape: ShapeMap[R]): Tensor<R> {
     const {sliceRank, numUpdates, sliceSize, strides, outputSize} =
