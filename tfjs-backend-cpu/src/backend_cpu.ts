@@ -16,7 +16,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs-core';
-import {engine, env} from '@tensorflow/tfjs-core';
+import {engine, env, TensorInfo} from '@tensorflow/tfjs-core';
 import {backend_util, buffer, slice_util, util} from '@tensorflow/tfjs-core';
 import {BackendTimingInfo, DataStorage, DataType, DataValues, KernelBackend, max, NumericDataType, Rank, reshape, Scalar, ShapeMap, Tensor, Tensor1D, Tensor2D, Tensor3D, Tensor4D, Tensor5D, TensorBuffer, TypedArray, upcastType} from '@tensorflow/tfjs-core';
 import {kernel_impls} from '@tensorflow/tfjs-core';
@@ -56,9 +56,8 @@ export interface TensorData<D extends DataType> {
   // For complex numbers, the real and imaginary parts are stored as their own
   // individual tensors, with a parent joining the two with the
   // complexTensors field.
-  // TODO(smilkov): Replace Tensor with TensorInfo when you modularize ops
-  // that work with complex tensors.
-  complexTensors?: {real: Tensor, imag: Tensor};
+  complexTensors?: {real: TensorInfo, imag: TensorInfo};
+  refCount: number;
 }
 
 export class MathBackendCPU extends KernelBackend {
@@ -90,15 +89,39 @@ export class MathBackendCPU extends KernelBackend {
             '\n============================');
       }
     }
+
     const dataId = {};
-    this.data.set(dataId, {values, dtype});
+    this.data.set(dataId, {values, dtype, refCount: 1});
+
+    return dataId;
+  }
+
+  incRef(dataId: DataId): DataId {
+    console.log('IM IN incRef');
+    if (!this.data.has(dataId)) {
+      throw new Error(
+          'Try to increase reference count, but dataId is not ' +
+          'found.');
+    }
+
+    const tensorData = this.data.get(dataId);
+    tensorData.refCount++;
+
+    if (tensorData.complexTensors != null) {
+      console.log('incRef a complex');
+      const {real, imag} = tensorData.complexTensors;
+      this.incRef(real.dataId);
+      this.incRef(imag.dataId);
+    }
+
     return dataId;
   }
 
   move(
       dataId: DataId, values: backend_util.BackendValues, shape: number[],
       dtype: DataType): void {
-    this.data.set(dataId, {values, dtype});
+    console.log('im in move');
+    this.data.set(dataId, {values, dtype, refCount: 0});
   }
 
   numDataIds(): number {
@@ -120,7 +143,7 @@ export class MathBackendCPU extends KernelBackend {
     return this.data.get(dataId).values;
   }
 
-  private bufferSync<R extends Rank>(t: Tensor<R>): TensorBuffer<R> {
+  private bufferSync<R extends Rank>(t: TensorInfo): TensorBuffer<R> {
     const data = this.readSync(t.dataId);
     let decodedData = data as DataValues;
     if (t.dtype === 'string') {
@@ -131,7 +154,8 @@ export class MathBackendCPU extends KernelBackend {
         throw new Error('Failed to decode encoded string bytes into utf-8');
       }
     }
-    return tf.buffer(t.shape, t.dtype, decodedData) as TensorBuffer<R>;
+    return tf.buffer(t.shape as ShapeMap[R], t.dtype, decodedData) as
+        TensorBuffer<R>;
   }
 
   private makeOutput<T extends Tensor>(
@@ -141,13 +165,26 @@ export class MathBackendCPU extends KernelBackend {
   }
 
   disposeData(dataId: DataId): void {
+    console.log('Entering disposeData');
     if (this.data.has(dataId)) {
-      const {complexTensors} = this.data.get(dataId);
-      if (complexTensors != null) {
-        complexTensors.real.dispose();
-        complexTensors.imag.dispose();
+      console.log('has dataId');
+      const tensorData = this.data.get(dataId);
+
+      // For complex TensorData, also need to dispose the underlying
+      // real and imag TensorData.
+      if (tensorData.complexTensors != null) {
+        const {real, imag} = tensorData.complexTensors;
+        this.disposeData(real.dataId);
+        this.disposeData(imag.dataId);
       }
-      this.data.delete(dataId);
+
+      tensorData.refCount--;
+      console.log(`tenorData refCount after --: ${tensorData.refCount}`);
+
+      if (tensorData.refCount === 0) {
+        console.log('DELETE');
+        this.data.delete(dataId);
+      }
     }
   }
 
@@ -166,29 +203,6 @@ export class MathBackendCPU extends KernelBackend {
           ['The reported memory is an upper bound. Due to automatic garbage ' +
            'collection, the true allocated memory may be less.']
     };
-  }
-
-  complex<T extends Tensor>(real: T, imag: T): T {
-    const result = this.makeOutput(null, real.shape, 'complex64');
-
-    const resultData = this.data.get(result.dataId);
-    // The backend owns the reference to the underlying real and imaginary
-    // clones. These will explicitly get disposed when the complex tensor is
-    // disposed.
-    resultData.complexTensors = {
-      real: engine().keep(real.clone()),
-      imag: engine().keep(imag.clone())
-    };
-
-    return result as T;
-  }
-  real<T extends Tensor>(input: T): T {
-    const resultData = this.data.get(input.dataId);
-    return resultData.complexTensors.real.clone() as T;
-  }
-  imag<T extends Tensor>(input: T): T {
-    const resultData = this.data.get(input.dataId);
-    return resultData.complexTensors.imag.clone() as T;
   }
 
   slice<T extends Tensor>(x: T, begin: number[], size: number[]): T {
@@ -552,9 +566,9 @@ export class MathBackendCPU extends KernelBackend {
 
     for (let i = 0; i < numSegments; ++i) {
       const segmentId = tf.scalar(i, 'int32');
-      const mask = tf.equal(segmentId, segmentIds).asType('float32');
-      const sum = mask.mul(x).sum(0);
-      res.push(sum);
+      // const mask = tf.equal(segmentId, segmentIds).asType('float32');
+      // const sum = mask.mul(x).sum(0);
+      res.push(segmentId);
     }
 
     return tf.stack(res);
@@ -2629,10 +2643,6 @@ export class MathBackendCPU extends KernelBackend {
 
   cast<T extends Tensor>(x: T, dtype: DataType): T {
     return backend_util.castTensor(x, dtype, this);
-  }
-
-  reshape<R extends Rank>(x: Tensor, shape: ShapeMap[R]): Tensor<R> {
-    return backend_util.reshapeTensor(x, shape);
   }
 
   avgPool(x: Tensor4D, convInfo: backend_util.Conv2DInfo): Tensor4D {

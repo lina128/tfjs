@@ -21,14 +21,18 @@ import {expectArraysClose} from '../test_util';
 import {PARALLELIZE_THRESHOLD} from './reduce_util';
 
 describeWithFlags('unsortedSegmentSum', ALL_ENVS, () => {
-  it('tensor1D', async () => {
+  fit('tensor1D', async () => {
     const t = tf.tensor1d([1, 2, 3, 4]);
     const segmentIds = tf.tensor1d([0, 2, 0, 1], 'int32');
     const numSegments = 3;
     const res = tf.unsortedSegmentSum(t, segmentIds, numSegments);
 
     expect(res.shape).toEqual([numSegments]);
-    expectArraysClose(await res.data(), [4, 4, 2]);
+    const result = await res.data();
+    for (let i = 0; i < 3; i++) {
+      console.log(result[i]);
+    }
+    expectArraysClose(result, [4, 4, 2]);
   });
 
   it('tensor2D', async () => {

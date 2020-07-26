@@ -16,6 +16,7 @@
  */
 
 import {ENGINE} from '../engine';
+import {real} from '../ops/real';
 import {scalar} from '../ops/scalar';
 import {tensor1d} from '../ops/tensor1d';
 import {zeros} from '../ops/zeros';
@@ -71,9 +72,11 @@ export function castTensor<T extends Tensor>(
     return ENGINE.makeTensorFromDataId(x.dataId, x.shape, dtype) as T;
   }
   if (x.dtype === 'complex64') {
-    const real = backend.real(x);
-    const result = real.cast(dtype);
-    real.dispose();
+    // TODO(linazhao): Call real kernel rather than op as part of cast
+    // kernel modularization.
+    const $real = real(x);
+    const result = $real.cast(dtype);
+    $real.dispose();
     return result as T;
   }
   if (dtype === 'int32') {

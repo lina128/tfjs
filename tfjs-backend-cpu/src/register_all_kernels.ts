@@ -19,14 +19,19 @@
 // the contents of this file and import only the kernels that are needed.
 import {KernelConfig, registerKernel} from '@tensorflow/tfjs-core';
 
+import {complexConfig} from './kernels/Complex';
 import {dilation2dConfig} from './kernels/Dilation2D';
 import {dilation2dBackpropFilterConfig} from './kernels/Dilation2DBackpropFilter';
 import {dilation2dBackpropInputConfig} from './kernels/Dilation2DBackpropInput';
 import {divConfig} from './kernels/Div';
+import {identityConfig} from './kernels/Identity';
+import {imagConfig} from './kernels/Imag';
 import {maxConfig} from './kernels/Max';
 import {maxPoolWithArgmaxConfig} from './kernels/MaxPoolWithArgmax';
 import {nonMaxSuppressionV4Config} from './kernels/NonMaxSuppressionV4';
 import {nonMaxSuppressionV5Config} from './kernels/NonMaxSuppressionV5';
+import {realConfig} from './kernels/Real';
+import {reshapeConfig} from './kernels/Reshape';
 import {rotateWithOffsetConfig} from './kernels/RotateWithOffset';
 import {squareConfig} from './kernels/Square';
 import {squaredDifferenceConfig} from './kernels/SquaredDifference';
@@ -34,9 +39,10 @@ import {transposeConfig} from './kernels/Transpose';
 
 // List all kernel configs here
 const kernelConfigs: KernelConfig[] = [
-  dilation2dConfig, dilation2dBackpropInputConfig,
-  dilation2dBackpropFilterConfig, divConfig, maxPoolWithArgmaxConfig, maxConfig,
-  nonMaxSuppressionV4Config, nonMaxSuppressionV5Config, rotateWithOffsetConfig,
+  complexConfig, dilation2dConfig, dilation2dBackpropInputConfig,
+  dilation2dBackpropFilterConfig, divConfig, identityConfig, imagConfig,
+  maxPoolWithArgmaxConfig, maxConfig, nonMaxSuppressionV4Config,
+  nonMaxSuppressionV5Config, realConfig, reshapeConfig, rotateWithOffsetConfig,
   squareConfig, squaredDifferenceConfig, transposeConfig
 ];
 

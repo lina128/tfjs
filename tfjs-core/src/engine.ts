@@ -808,6 +808,7 @@ export class Engine implements TensorTracker, DataMover {
       this.state.tensorInfo.delete(a.dataId);
     } else {
       this.state.tensorInfo.get(a.dataId).refCount--;
+      info.backend.disposeData(a.dataId);
     }
     // TODO(nsthorat): Construct an error and save the stack trace for
     // debugging when in debug mode. Creating a stack trace is too expensive
