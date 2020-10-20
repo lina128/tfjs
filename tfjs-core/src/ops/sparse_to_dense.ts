@@ -70,7 +70,7 @@ function sparseToDense_<R extends Rank>(
   const $sparseIndices =
       convertToTensor(sparseIndices, 'sparseIndices', 'sparseToDense', 'int32');
   const $sparseValues =
-      convertToTensor(sparseValues, 'sparseValues', 'sparseToDense');
+      convertToTensor(sparseValues, 'sparseValues', 'sparseToDense', null);
   const $defaultValue = convertToTensor(
       defaultValue, 'defaultValue', 'sparseToDense', $sparseValues.dtype);
 
